@@ -75,6 +75,43 @@ getSessionId() {
   return SessionId
 } ; End getSessionId
 
+getElementMeasurements() {
+  ; Todo, figure out if the position of the gui should be vertical or horizonatal, and on whitch edge.
+  WinGetPos, taskX, taskY, taskW, taskH, ahk_class Shell_TrayWnd
+  if(taskX > 0) { ; right edge
+    return {"right"
+      : {"wholeSpace": {"x": A_ScreenWidth * 29 / 30, "y": 0, "w":  A_ScreenWidth  / 30, "h": A_ScreenHeight}
+      , "removeButton":{"x": A_ScreenWidth * 29 / 30, "y": 0, "w": A_ScreenWidth / 30, "h": A_ScreenHeight / 14}
+      , "addButton":{"x": A_ScreenWidth * 29 / 30, "y": A_ScreenHeight * 11 / 14, "w": A_ScreenWidth / 30, "h": A_ScreenHeight / 14}
+      , "grabButton":{"x": A_ScreenWidth * 29 / 30, "y": A_ScreenHeight * 12 / 14, "w": A_ScreenWidth / 30, "h": A_ScreenHeight / 14}
+      , "followButton":{"x": A_ScreenWidth * 29 / 30, "y": A_ScreenHeight * 13 / 14, "w": A_ScreenWidth / 30, "h": A_ScreenHeight / 14}
+      , "desktopButtons":{"x": A_ScreenWidth * 29 / 30, "y": A_ScreenHeight / 14, "w": A_ScreenWidth / 30, "h": "undefined"}}}
+  } else if(taskY > 0) { ; bottom edge
+    return {"bottom"
+      : {"wholeSpace": {"x": 0, "y": A_ScreenHeight * 29 /30, "w":   A_ScreenWidth, "h": A_ScreenHeight/30}
+      , "removeButton":{"x": 0, "y": A_ScreenHeight * 29 / 30, "w": A_ScreenWidth * .05 , "h": A_ScreenHeight / 30}
+      , "addButton":{"x": A_ScreenWidth / 16 * 1.5, "y": A_ScreenHeight * 29 / 30, "w": A_ScreenWidth * .05, "h": A_ScreenHeight / 30}
+      , "grabButton":{"x": A_ScreenWidth * 14 / 16 * 1.5, "y": A_ScreenHeight * 29 / 30, "w": A_ScreenWidth * .05, "h": A_ScreenHeight / 30}
+      , "followButton":{"x": A_ScreenWidth * 15 / 16 * 1.5, "y": A_ScreenHeight * 29 / 30, "w": A_ScreenWidth * .05, "h": A_ScreenHeight / 30}
+      , "desktopButtons":{"x": A_ScreenWidth * 2 / 16 * 1.5, "y": A_ScreenHeight * 29 / 30, "w": "undefined", "h": A_ScreenHeight / 30}}}
+  } else if(taskW > taskH) { ;top edge
+    return {"top"
+      : {"wholeSpace": {"x": 0, "y": 0, "w":   A_ScreenWidth, "h": A_ScreenHeight/30}
+      , "removeButton":{"x": 0, "y": 0, "w": A_ScreenWidth * .05 , "h": A_ScreenHeight / 30}
+      , "addButton":{"x": A_ScreenWidth / 16 * 1.5, "y": 30, "w": A_ScreenWidth * .05, "h": A_ScreenHeight / 30}
+      , "grabButton":{"x": A_ScreenWidth * 14 / 16 * 1.5, "y": 0, "w": A_ScreenWidth * .05, "h": A_ScreenHeight / 30}
+      , "followButton":{"x": A_ScreenWidth * 15 / 16 * 1.5, "y": 0, "w": A_ScreenWidth * .05, "h": A_ScreenHeight / 30}
+      , "desktopButtons":{"x": A_ScreenWidth * 2 / 16 * 1.5, "y": 0, "w": "undefined", "h": A_ScreenHeight / 30}}}
+  } else { ; left edge
+    return {"left"
+      : {"wholeSpace": {"x": 0, "y": 0, "w":  A_ScreenWidth  / 30, "h": A_ScreenHeight}
+      , "removeButton":{"x": 0, "y": 0, "w": A_ScreenWidth / 30, "h": A_ScreenHeight / 14}
+      , "addButton":{"x": 0, "y": A_ScreenHeight * 11 / 14, "w": A_ScreenWidth / 30, "h": A_ScreenHeight / 14}
+      , "grabButton":{"x": 0, "y": A_ScreenHeight * 12 / 14, "w": A_ScreenWidth / 30, "h": A_ScreenHeight / 14}
+      , "followButton":{"x": 0, "y": A_ScreenHeight * 13 / 14, "w": A_ScreenWidth / 30, "h": A_ScreenHeight / 14}
+      , "desktopButtons":{"x": 0, "y": A_ScreenHeight / 14, "w": A_ScreenWidth / 30, "h": "undefined"}}}
+  }
+}
 
 ; This function redraws the gui if desktops are created or removed 
 guiCreateByDesktopCount() {
