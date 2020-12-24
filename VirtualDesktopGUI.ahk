@@ -90,7 +90,9 @@ getSessionId() {
 ; the gui, and the coordinates to display the gui at.
 getElementMeasurements(taskCoords) {
   screen := {"w": A_ScreenWidth, "h": A_ScreenHeight}
-  if(taskCoords.x > 0) { ; right edge is opposite
+  
+  ; task bar to the right, gui to the left
+  if(taskCoords.x > 0) { 
     return {"edge": "left"
             ,"orientation": "vertical"
             ,"taskbar": taskCoords
@@ -114,6 +116,8 @@ getElementMeasurements(taskCoords) {
               ,"desktopButtons"
                   :{"x": 0, "y": screen.h / 14
                   , "w": screen.w / 30, "h": screen.h * 10 / 14}}}
+                  
+  ; task bar at the bottom, gui at the top
   } else if(taskCoords.y > 0) { ; bottom edge is opposite
     return {"edge": "top"
             ,"orientation": "horizontal"
@@ -137,7 +141,9 @@ getElementMeasurements(taskCoords) {
               , "desktopButtons"
                     :{"x": screen.w /32, "y": 0
                     , "w": screen.w * 28 / 32 , "h": screen.h / 32}}}
-  } else if(taskCoords.w > taskCoords.h) { ;top edge is opposite
+                    
+  ; task bar to the at the top, gui at the bottom
+  } else if(taskCoords.w > taskCoords.h) {
     return {"edge": "bottom"
             ,"orientation": "horizontal"
             ,"taskbar": taskCoords
@@ -161,7 +167,9 @@ getElementMeasurements(taskCoords) {
               ,"desktopButtons"
                   :{"x": screen.w /32, "y": 0
                   , "w": screen.w * 28 / 32 , "h": screen.h / 32}}}
-  } else { ; left edge is opposite
+                  
+  ; task bar to the left, gui to the right
+  } else {
     return {"edge": "right"
             ,"orientation": "vertical"
             , "taskbar": taskCoords
