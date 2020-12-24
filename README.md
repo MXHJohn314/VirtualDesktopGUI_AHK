@@ -10,22 +10,22 @@ This is a modification of the AutoHotkey Script seen at  https://www.computerhop
     <img src="VirtualDesktopGUI.svg" alt="Logo" width="160" height="160">
   </a>
 
-  <h3 align="center">BattleShip</h3>
+  <h3 align="center">
+  Ship</h3>
 
   <p align="center">
-    A simple console based implementation of the classic BattleShip game in Rust,
-with an AI.
+    A GUI for virtual desktop management and window movement between virtual desktops
     <br />
     <a href="https://github.com/GalacticWafer/VirtualDesktopGUI_AHK"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <!--<a href="https://github.com/GalacticWafer/BattleShip">View Demo</a>-->
+    <!--<a href="https://github.com/GalacticWafer/VirtualDesktopGUI_AHK">View Demo</a>-->
     ·
-    <a href="https://github.com/GalacticWafer/BattleShip/issues">Report Bug</a>
+    <a href="https://github.com/GalacticWafer/VirtualDesktopGUI_AHK/issues">Report Bug</a>
     ·
-    <a href="https://github.com/GalacticWafer/BattleShip/issues">Request Feature</a>
+    <a href="https://github.com/GalacticWafer/VirtualDesktopGUI_AHK/issues">Request Feature</a>
   </p>
-  
+
   
   
 <!-- TABLE OF CONTENTS -->
