@@ -7,7 +7,7 @@ main() {
   global desknum
   global targetnum
   
-  ; Modern Apps need this prefix to their titles in order to move them
+  ; Modern Apps need this prefix to their titles in order to move them.
   MODERN_APP_AHK_CLASS 
   := "ahk_class ApplicationFrameWindow ahk_exe ApplicationFrameHost.exe"
 
@@ -17,7 +17,7 @@ main() {
 }
 main()
 
-; This function looks at the registry to determine the list of virtual desktops
+; This function looks at the registry to get the list of virtual desktops.
 mapDesktopsFromRegistry(rebuildGui := true) {
   global CurrentDesktop, DesktopCount
   
@@ -36,16 +36,16 @@ mapDesktopsFromRegistry(rebuildGui := true) {
     }
   }
 
-  ; Get a list of the UUIDs for all virtual desktops on the system
+  ; Get a list of the UUIDs for all virtual desktops on the system.
   registryString 
   := "SOFTWARE\Microsoft\Windows\CurrentVersion"
       . "\Explorer\VirtualDesktops"
   RegRead, DesktopList, HKEY_CURRENT_USER,% registryString, VirtualDesktopIDs
   
-  ; Figure out how many virtual desktops there are
+  ; Figure out how many virtual desktops there are.
   DesktopCount := DesktopList ? StrLen(DesktopList) / IdLength : 1
 
-  ; Remember how many desktops there are
+  ; Remember how many desktops there are.
   A_LastDesktopCount := DesktopCount
   if(rebuildGui) {
     guiCreateByDesktopCount(taskBarHasMoved().taskCoords) ;create the gui
@@ -69,20 +69,18 @@ mapDesktopsFromRegistry(rebuildGui := true) {
   return taskBarLocation
 }
 
-; This function finds out ID of current session.
+; This function finds out what the ID of current session is.
 getSessionId() {
   ProcessId := DllCall("GetCurrentProcessId", "UInt")
   if ErrorLevel {
     OutputDebug, Error getting current process id: %ErrorLevel%
     return
   }
-  ;~ OutputDebug, Current Process Id: %ProcessId%
   DllCall("ProcessIdToSessionId", "UInt", ProcessId, "UInt*", SessionId)
   if ErrorLevel {
     OutputDebug, Error getting session id: %ErrorLevel%
     return
   }
-  ;~ OutputDebug, Current Session Id: %SessionId%
   return SessionId
 } ; End getSessionId
 
@@ -91,7 +89,7 @@ getSessionId() {
 getElementMeasurements(taskCoords) {
   screen := {"w": A_ScreenWidth, "h": A_ScreenHeight}
   
-  ; task bar to the right, gui to the left
+  ; Task bar is to the right, gui goes to the left.
   if(taskCoords.x > 0) { 
     return {"edge": "left"
             ,"orientation": "vertical"
@@ -117,7 +115,7 @@ getElementMeasurements(taskCoords) {
                   :{"x": 0, "y": screen.h / 14
                   , "w": screen.w / 30, "h": screen.h * 10 / 14}}}
                   
-  ; task bar at the bottom, gui at the top
+  ; Task bar is at the bottom, gui goes at the top.
   } else if(taskCoords.y > 0) { ; bottom edge is opposite
     return {"edge": "top"
             ,"orientation": "horizontal"
@@ -142,7 +140,7 @@ getElementMeasurements(taskCoords) {
                     :{"x": screen.w /32, "y": 0
                     , "w": screen.w * 28 / 32 , "h": screen.h / 32}}}
                     
-  ; task bar to the at the top, gui at the bottom
+  ; Task bar is to the at the top, gui goes at the bottom.
   } else if(taskCoords.w > taskCoords.h) {
     return {"edge": "bottom"
             ,"orientation": "horizontal"
@@ -168,7 +166,7 @@ getElementMeasurements(taskCoords) {
                   :{"x": screen.w /32, "y": 0
                   , "w": screen.w * 28 / 32 , "h": screen.h / 32}}}
                   
-  ; task bar to the left, gui to the right
+  ; Task bar is to the left, gui goes to the right.
   } else {
     return {"edge": "right"
             ,"orientation": "vertical"
@@ -195,7 +193,7 @@ getElementMeasurements(taskCoords) {
   }
 }
 
-; This function checks if the task bar has moved
+; This function checks if the task bar has moved.
 taskBarHasMoved() {
   global DesktopCount
   static A_LastDesktopCount
@@ -214,7 +212,7 @@ taskBarHasMoved() {
     return {"hasMoved": hasMoved, "taskCoords": taskCoords}
 }
 
-; This function redraws the gui if desktops are created or removed 
+; This function redraws the gui if desktops are created or removed .
 guiCreateByDesktopCount(taskCoords) {
     global A_LastDesktopCount, taskBarLocation, DesktopCount
 
@@ -236,7 +234,7 @@ guiCreateByDesktopCount(taskCoords) {
         . " +Border"
         . " +E0x08000000"
 
-    ; Create a new button for each desktop
+    ; Create a new button for each desktop.
     isVertical := measurements.orientation = "vertical"
     posButtons := measurements.positions.desktopButtons
 
@@ -245,7 +243,7 @@ guiCreateByDesktopCount(taskCoords) {
         ? posButtons.w / DesktopCount
         : posButtons.h / DesktopCount
         
-      ;each desktop button has the same dimensions
+      ; Each desktop button has the same dimensions.
       Gui, Add, Button, % ""
       . " x" posButtons.x + ( isVertical ? 0 
                             : posButtons.w /  DesktopCount * (A_Index - 1))
@@ -268,7 +266,7 @@ guiCreateByDesktopCount(taskCoords) {
     }
     
     specialButtons := measurements.positions.specialButtons
-    ; Create each of the special function buttons
+    ; Create each of the special function buttons.
     for buttonName, specialButton in specialButtons {
       Gui, Add, Button, % ""
     . " x" specialButton.x
@@ -278,8 +276,8 @@ guiCreateByDesktopCount(taskCoords) {
     ,% buttonName
     }
     
-    ; Name the gui and get its position, and save the taskbar 
-    ; x and y coordinates to check if the gui should move later
+    ; Name the gui and get its position, and save the taskbar
+    ; x and y coordinates to check if the gui should move later.
     gui, show,% ""
     . " x" guiSpace.x
     . " y" guiSpace.y
@@ -303,21 +301,21 @@ guiCreateByDesktopCount(taskCoords) {
         
         WinGetPos, x, y, w, h,% ID2Title
         
-        ; too far left, scoot right and subtract from width
+        ; Window is too far left, scoot right and subtract from width.
         if(x < guiSpace.w && edge = "left"){
           x := guiSpace.w
           w -= (guiSpace.w - x)
         }
-        ; too far up, scoot down and subtract from width
+        ; Window is too far up, scoot down and subtract from width.
         if(y < guiSpace.h && edge = "top"){
           y := guiSpace.h
           h -= (guiSpace.h - y)
         }
-        ; too far down, subtract from height
+        ; Window is too far down, subtract from height to shorten it.
         if(y > guiSpace.y && edge = "bottom"){
           h -= (y + h - guiSpace.y)
         }
-        ; too far right, subtract from width
+        ; Window is too far right, subtract from width make it more narrow.
         if(x + w > guiSpace.x && edge = "right"){
           w -= (x + w - guiSpace.x)
         }
@@ -327,19 +325,29 @@ guiCreateByDesktopCount(taskCoords) {
     }
 }
 
-; Helper method to make sure we don't try to move 
-; certain windows that should not or cannot be moved.
-contains(badTitles, title) {
-  for key, val in badTitles {
-    if(val = title) {
-      return true
+; This function moves the user to the given virtual desktop if it exists.
+; It prepares for a call to switchDesktopByNumber() function.
+moveToDesktop(targetDesktop) {
+  global CurrentDesktop, DesktopCount
+
+  ; Save the active window's name to potentially move it later
+  WinGetActiveTitle, title
+
+  ; Runs if we want to move a window to another desktop
+  ; and any window except besides the gui is active
+  if (CurrentDesktop != targetDesktop) {
+    if(WinActive, "ahk_class ApplicationFrameWindow") {
+      title := title " " MODERN_APP_AHK_CLASS
     }
+    winhide, % title
+    switchDesktopByNumber(targetDesktop)
+    winshow,% title
+    windowWasGrabbed := false
   }
-  return false
 }
 
 ; This function takes a number to a corresponding deskotp
-; and switches the screen to that desktop
+; and switches the screen to that desktop.
 switchDesktopByNumber(targetDesktop) {
   global CurrentDesktop, DesktopCount
   
@@ -348,20 +356,20 @@ switchDesktopByNumber(targetDesktop) {
   ; switched desktops via some other means than the script.
   mapDesktopsFromRegistry(false)
 
-  ; Don't attempt to switch to an invalid desktop
+  ; Don't attempt to switch to an invalid desktop.
   if (targetDesktop > DesktopCount || targetDesktop < 1) {
     OutputDebug, [invalid] target: %targetDesktop% current: %CurrentDesktop%
     return
   }
 
-  ; Scan right until we reach the desktop we want
+  ; Scan right until we reach the desktop we want.
   while(CurrentDesktop < targetDesktop) {
     Send ^#{Right}
     CurrentDesktop++
     OutputDebug, [Right] target: %targetDesktop% current: %CurrentDesktop%
   }
 
-  ; Scan left until we reach the desktop we want
+  ; Scan left until we reach the desktop we want.
   while(CurrentDesktop > targetDesktop) {
     Send ^#{Left}
     CurrentDesktop--
@@ -370,7 +378,7 @@ switchDesktopByNumber(targetDesktop) {
   DetectHiddenWindows, off
 }
 
-; This function creates a new virtual desktop and associated button
+; This function creates a new virtual desktop and associated button.
 createVirtualDesktop() {
   global CurrentDesktop, DesktopCount
   Send, #^d
@@ -381,7 +389,7 @@ createVirtualDesktop() {
   guiCreateByDesktopCount(taskBarHasMoved().taskCoords)
 }
 
-; This function deletes the current virtual desktop and associated button
+; This function deletes the current virtual desktop and associated button.
 deleteVirtualDesktop() {
   global CurrentDesktop, DesktopCount
   if(DesktopCount == 1){
@@ -395,12 +403,32 @@ deleteVirtualDesktop() {
   guiCreateByDesktopCount(taskBarHasMoved().taskCoords)
 }
 
+; This function checks if the gui needs to move.
+; It is invoked from the guiCheck label above.
+guiCheck() {
+  taskBarCheck := taskBarHasMoved()
+  if(taskBarCheck.hasMoved) {
+    guiCreateByDesktopCount(taskBarCheck.taskCoords)
+  }
+}
+
+; Helper method to make sure we don't try to move 
+; certain windows that should not or cannot be moved.
+contains(badTitles, title) {
+  for key, val in badTitles {
+    if(val = title) {
+      return true
+    }
+  }
+  return false
+}
+
 ; Hotkey F18 is a stylus pen button, used to detect gui presses,
-; and toggles the boolean value 'movewin'
+; and toggles the boolean value 'movewin'.
 ~F18::windowWasGrabbed = true
 
 ; This is the button for selecting a one-time movement of
-; a window to whichever virtual desktop is chosen next
+; a window to whichever virtual desktop is chosen next.
 ButtonGRAB:
 if (windowWasGrabbed) {
   ToolTip, Window movement off, %grabx%-300, %graby%-100
@@ -415,8 +443,8 @@ windowWasGrabbed := true
 SetTimer, RemoveToolTip, 5000
 return
 
-; This is the button for selecting a window to always 
-; follow the user to the active desktop
+; This is the button for selecting a window to always
+; follow the user to the active desktop.
 ButtonFOLLOW:
 WinWaitNotActive, desktop switcher
 WinGetActiveTitle, bring
@@ -433,33 +461,16 @@ SetTimer, RemoveToolTip, 5000
 return
 
 
-; Label for removing tooltip
+; This label removes a tooltip.
 RemoveToolTip:
 SetTimer, RemoveToolTip, Off
 ToolTip
 return
 
-; Runs this goto when any of the DESKTOP buttons are pressed
+; This label uses regex to extract the desktop number from the a DESKTOP 
+; buttons button when pressed, and passes it the the moveToDesktop function.
 DesktopButtons:
-global CurrentDesktop, DesktopCount
-
-; Keep only the number of the desktop to do math with it
-targetDesktop := RegExReplace(A_GuiControl, "DESKTOP", "")
-
-; Save the active window's name to potentially move it later
-WinGetActiveTitle, title
-
-; Runs if we want to move a window to another desktop
-; and any window except besides the gui is active
-if (CurrentDesktop != targetDesktop) {
-  if(WinActive, "ahk_class ApplicationFrameWindow") {
-    title := title " " MODERN_APP_AHK_CLASS
-  }
-  winhide, % title
-  switchDesktopByNumber(targetDesktop)
-  winshow,% title
-  windowWasGrabbed := false
-}
+moveToDesktop(RegExReplace(A_GuiControl, "DESKTOP", ""))
 return
 
 ; This label checks if the gui needs to be redrawn
@@ -468,15 +479,6 @@ guiCheck:
 guiCheck()
 SetTimer, guiCheck, -500
 return
-
-; This function checks if the gui needs to move.
-; It is invoked from the guiCheck label above
-guiCheck() {
-  taskBarCheck := taskBarHasMoved()
-  if(taskBarCheck.hasMoved) {
-    guiCreateByDesktopCount(taskBarCheck.taskCoords)
-  }
-}
 
 ; This is the add button label
 Button+:
