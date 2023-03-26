@@ -1,513 +1,200 @@
-#SingleInstance force
-#Persistent
-;~ #NoTrayIcon
+#SingleInstance, force
 
-main() {
-  ; Globals
-  global desknum
-  global targetnum
-  
-  ; Modern Apps need this prefix to their titles in order to move them.
-  MODERN_APP_AHK_CLASS 
-  := "ahk_class ApplicationFrameWindow ahk_exe ApplicationFrameHost.exe"
+goto, mapRectangles
 
-  SetKeyDelay, 75
-  taskBarLocation := mapDesktopsFromRegistry()
-  setTimer, guiCheck, 5
-}
-main()
+mapRectangles:
+{
+    splitModes := {}
+    splitModes["ThreeTall"] := [{"x": 0, "y": 0, "w": 1 / 3, "h": 1}, {"x": 1 / 3, "y": 0, "w": 1 / 3, "h": 1}, {"x": 2 / 3, "y": 0, "w": 1 / 3, "h": 1}]
+    splitModes["SplitTopBottom"] := [{"x": 0, "y": 0, "w": 1, "h": 1 / 2}, {"x": 0, "y": 1 / 2, "w": 1, "h": 1 / 2}]
+    numArrangements := 0 ;number of 'RectangleArrangement's
+    rectangles := [ ] ; holds a single 'RectangleArrangement'
+    arrangements := {} ; holds all the 'RectangleArrangement's
+    offset := 0 ; accumulates an offset of where to place the next arrangement's elements in the gui
+    scaleY := A_ScreenHeight / 16 ; scale for Rectangle.x fields
+    scaleX := A_ScreenWidth / ( 2 * (numArrangements > 6 ? numArrangements : 6)) ; scale for Rectangle.y fields
+    buttonWidth := A_ScreenWidth / 20 ; width for 'gTop' buttons
+    topButtonH := A_ScreenHeight / ( buttonWidth / A_ScreenWidth ) ; height for 'gTop buttons
+    default_color := 0xffffff
+    guiWidth := 0 ;start new buttons at 0
+    padding := buttonWidth / 20
+    gui, gBottom: +AlwaysOnTop +Caption -ToolWindow
+    numArrangements := 0
+    for arrangementName, measurements in splitModes { ; look into each arrangement in the associative array
+        for i, rect in measurements { ; look at all the rectangles inside each arrangement
+            if(i == 1) {
+                soloButtonPos := guiWidth ; The x position of any arrangement when it is in "solo mode" is the same as the first arrangement's x position
+            }
+            r := new Rectangle({"x": rect.x, "y": rect.y, "w": rect.w, "h": rect.h, "name": arrangementName  "_" A_Index
+            , "homePos": {"x": rect.x * scaleX + guiWidth, "y": rect.y * scaleY, "w": rect.w * scaleX, "h":  rect.h * scaleY}
+            , "soloPos": {"x": rect.x * scaleX, "y": rect.y * scaleY, "w": " w" rect.w * scaleX, "h":  rect.h * scaleY}})
+            rectangles.push(r)
+            h := r.homePos
+            gui, gBottom: add, button,% "hwnd" r.hwnd " v" r.name " gmini x" h.x " y" h.y " w" h.w " h"  h.h , % r.name
+            r.hwnd := rhwnd
+            r.homePos := recPos
+            r.soloPos := r.x * scaleX
+        }
 
-; This function looks at the registry to get the list of virtual desktops.
-mapDesktopsFromRegistry(rebuildGui := true) {
-  global CurrentDesktop, DesktopCount
-  
-  ; Get the current desktop UUID. Length should be 32 always, but there's 
-  ; no guarantee this couldn't change in a later Windows release so we check.
-  IdLength := 32
-  SessionId := getSessionId()
-  if (SessionId) {
-    registryString 
-    := "HKEY_CURRENT_USER\SOFTWARE\Microsoft\"
-      . "Windows\CurrentVersion\Explorer\"
-      . "SessionInfo\" SessionId "\VirtualDesktops"
-    RegRead, CurrentDesktopId,% registryString, CurrentVirtualDesktop
-    if (CurrentDesktopId) {
-      IdLength := StrLen(CurrentDesktopId)
+        a := new RectangleArrangement({"rectangles": rectangles, "len": i, "factor": scaleX, "name": arrangementName, "buttonPos": {"x": guiWidth, "y": padding, "w": scaleX, "h": topButtonH}, "soloButtonPos": {"x": soloButtonPos, "y": padding, "w": scaleX, "h": topButtonH}})
+        h := a.buttonPos
+        f := func("setSoloPosition").bind(a, arrangements)
+        gui, gTop: add, Button,% " v" a.name " x" h.x " y" h.x " w" h.w " h" h.h " hwnd" a.hwnd  " gsetSoloPosition",% a.name
+        ;~ gui, gTop: add, button,% "hwnd" a.hwnd " v" a.name " gfirstTop x" h.x " y" h.x " w" h.w " h" h.h, % a.name
+        guiWidth += scaleX + padding
+        rectangles := [ ] ;empty the rectangles array for the next set, then push to array
+        arrangements[arrangementName] := a
+        numArrangements += 1
     }
-  }
+    guiWidth += padding ;
 
-  ; Get a list of the UUIDs for all virtual desktops on the system.
-  registryString 
-  := "SOFTWARE\Microsoft\Windows\CurrentVersion"
-      . "\Explorer\VirtualDesktops"
-  RegRead, DesktopList, HKEY_CURRENT_USER,% registryString, VirtualDesktopIDs
-  
-  ; Figure out how many virtual desktops there are.
-  DesktopCount := DesktopList ? StrLen(DesktopList) / IdLength : 1
-
-  ; Remember how many desktops there are.
-  A_LastDesktopCount := DesktopCount
-  if(rebuildGui) {
-    guiCreateByDesktopCount(taskBarHasMoved().taskCoords) ;create the gui
-  }
-
-  ; Parse the REG_DATA string that stores the array of UUID's 
-  ; for virtual desktops in the registry.
-  i := 0
-  while (CurrentDesktopId and i < DesktopCount) {
-    StartPos := (i * IdLength) + 1
-    DesktopIter := SubStr(DesktopList, StartPos, IdLength)
-    
-    ; Break out if we find a match in the list. If we didn't find anything,
-    ; keep the old guess and pray we're still correct.
-    if (DesktopIter = CurrentDesktopId) {
-      CurrentDesktop := i + 1
-      break
-    }
-    i++
-  }
-  return taskBarLocation
-}
-
-; This function finds out what the ID of current session is.
-getSessionId() {
-  ProcessId := DllCall("GetCurrentProcessId", "UInt")
-  if ErrorLevel {
-    OutputDebug, Error getting current process id: %ErrorLevel%
+    gui, gBottom: +AlwaysOnTop +Caption -ToolWindow -Border
+    gui, gTop: +AlwaysOnTop +Caption -ToolWindow -Border
+    Gui, gBottom: Show,% "xCenter y" A_ScreenHeight * 15 / 16 - scaleY " w" guiWidth " h" scaleY, gBottom
+    Gui, gTop: Show,% "xCenter y" A_ScreenHeight * 15 / 16 - scaleY " w" guiWidth " h" scaleY, gTop
+    WinSet, Transparent, 1, gTop
+    Gui, gBottom: hide
+    Gui, gTop: Hide
     return
-  }
-  DllCall("ProcessIdToSessionId", "UInt", ProcessId, "UInt*", SessionId)
-  if ErrorLevel {
-    OutputDebug, Error getting session id: %ErrorLevel%
-    return
-  }
-  return SessionId
-} ; End getSessionId
+}
+setSoloPosition:
+currentArrangement := arrangements[A_GuiControl]
+for arangementName, arrangement in arrangements {
+    isSelectedArranment := arrangement.name = A_GuiControl
+    arrangement.setSoloPosition(isSelectedArranment)
+    arrangement.setVisible(isSelectedArranment)
+}
+goto soloPositionLabel
+return
 
-; This function calculates the area to be given to different buttons on 
-; the gui, and the coordinates to display the gui at.
-getElementMeasurements(taskCoords) {
-  screen := {"w": A_ScreenWidth, "h": A_ScreenHeight}
-  
-  ; Task bar is to the right, gui goes to the left.
-  if(taskCoords.x > 0) { 
-    return {"edge": "left"
-            ,"orientation": "vertical"
-            ,"taskbar": taskCoords
-            ,"positions"
-              : {"guiSpace"
-                  : {"x": 0, "y": 0
-                  , "w":  screen.w  / 30, "h": screen.h}
-            ,"specialButtons"
-              :{"X"
-                  :{"x": 0, "y": 0
-                  , "w": screen.w / 30, "h": screen.h / 14}
-              ,"+"
-                  :{"x": 0, "y": screen.h * 11 / 14
-                  , "w": screen.w / 30, "h": screen.h / 14}
-              ,"GRAB"
-                  :{"x": 0, "y": screen.h * 12 / 14
-                  , "w": screen.w / 30, "h": screen.h / 14}
-              ,"FOLLOW"
-                    :{"x": 0, "y": screen.h * 13 / 14
-                    , "w": screen.w / 30, "h": screen.h / 14}}
-              ,"desktopButtons"
-                  :{"x": 0, "y": screen.h / 14
-                  , "w": screen.w / 30, "h": screen.h * 10 / 14}}}
-                  
-  ; Task bar is at the bottom, gui goes at the top.
-  } else if(taskCoords.y > 0) { ; bottom edge is opposite
-    return {"edge": "top"
-            ,"orientation": "horizontal"
-            ,"taskbar": taskCoords
-            ,"positions"
-              : {"guiSpace"
-                    :{"x": 0, "y": 0
-                    , "w":   screen.w, "h": screen.h/32}
-              ,"specialButtons"
-                    : {"X": {"x": 0, "y": 0
-                    , "w": screen.w /32 , "h": screen.h / 32}
-              ,"+"
-                    :{"x": screen.w  * 29 /32, "y": 0
-                    , "w": screen.w / 32, "h": screen.h / 32}
-              ,"GRAB"
-                    :{"x": screen.w * 30 /32, "y": 0
-                    , "w": screen.w / 32, "h": screen.h / 32}
-              ,"FOLLOW"
-                    :{"x": screen.w * 31 /32, "y": 0
-                    , "w": screen.w / 32, "h": screen.h / 32}}
-              , "desktopButtons"
-                    :{"x": screen.w /32, "y": 0
-                    , "w": screen.w * 28 / 32 , "h": screen.h / 32}}}
-                    
-  ; Task bar is to the at the top, gui goes at the bottom.
-  } else if(taskCoords.w > taskCoords.h) {
-    return {"edge": "bottom"
-            ,"orientation": "horizontal"
-            ,"taskbar": taskCoords
-            ,"positions"
-              :{"guiSpace"
-                :{"x": 0, "y": screen.h * 31 / 32
-                ,"w":   screen.w, "h": screen.h/32}
-              ,"specialButtons"
-              :{"X"
-                  :{"x": 0, "y": 0
-                  ,"w": screen.w /32 , "h": screen.h / 32}
-              ,"+"
-                  :{"x": screen.w  * 29 /32, "y": 0
-                  ,"w": screen.w / 32, "h": screen.h / 32}
-              ,"GRAB"
-                  :{"x": screen.w * 30 /32, "y": 0
-                  ,"w": screen.w / 32, "h": screen.h / 32}
-              ,"FOLLOW"
-                  :{"x": screen.w * 31 /32, "y": 0
-                  , "w": screen.w / 32, "h": screen.h / 32}}
-              ,"desktopButtons"
-                  :{"x": screen.w /32, "y": 0
-                  , "w": screen.w * 28 / 32 , "h": screen.h / 32}}}
-                  
-  ; Task bar is to the left, gui goes to the right.
-  } else {
-    return {"edge": "right"
-            ,"orientation": "vertical"
-            , "taskbar": taskCoords
-            , "positions"
-              : {"guiSpace"
-                  :{"x": screen.w  * 29 / 30, "y": 0
-                  , "w":  screen.w  / 30, "h": screen.h}
-              ,"specialButtons"
-                  :{"X": {"x": 0, "y": 0
-                  , "w": screen.w / 30, "h": screen.h / 14}
-              ,"+"
-                  :{"x": 0, "y": screen.h * 11 / 14
-                  ,"w": screen.w / 30, "h": screen.h / 14}
-              ,"GRAB"
-                  :{"x": 0, "y": screen.h * 12 / 14
-                  ,"w": screen.w / 30, "h": screen.h / 14}
-              ,"FOLLOW"
-                  :{"x": 0, "y": screen.h * 13 / 14
-                  , "w": screen.w / 30, "h": screen.h / 14}}
-              ,"desktopButtons"
-                  :{"x": 0, "y": screen.h / 14
-                  , "w": screen.w / 30, "h": screen.h * 11 / 14}}}
-  }
+mini:
+Gui, gBottom: hide ; selected a button, so hide both
+Gui, gTop: Hide
+
+return
+
+mini(controlName, offsetX) {
+    MsgBox % A_GuiControl
+    GuiControlGet, miniposition, Pos, %controlName%
+    minipositionX -= offsetX
+    return minipositionX
 }
 
-; This function checks if the task bar has moved.
-taskBarHasMoved() {
-  global DesktopCount
-  static A_LastDesktopCount
-  static oldCoords := ""
-  WinGetPos, taskX, taskY, taskW, taskH, ahk_class Shell_TrayWnd
-  taskCoords := {"x": taskX, "y": taskY, "w": taskW, "h": taskH}
-  hasMoved
-  := A_LastDesktopCount != DesktopCount
-    || oldCoords.x != taskCoords.x
-    || oldCoords.y != taskCoords.y
-    || oldCoords.w != taskCoords.w
-    || oldCoords.h != taskCoords.h
-    
-    oldCoords := taskCoords
-    A_LastDesktopCount := DesktopCount
-    return {"hasMoved": hasMoved, "taskCoords": taskCoords}
+moveWindows(arrangement) {
+
+   global gBottom ; Declare global variables to be used within the function
+    global gTop
+
+    SetTitleMatchMode, 2 ; Set the title match mode to match any part of the window title
+
+   for _, r in  % arrangement.rectangles { ; loop through the rectangles in the selected arrangement
+       send, ^!{Tab} ; Send a Ctrl+Alt+Tab keystroke to activate task switching
+       sleep, 300 ; wait for 300ms to ensure the window switcher has appeared
+       WinWaitNotActive, Task Switching ; Wait for the task switcher to disappear
+       WinGetActiveTitle, t ; Get the title of the currently active window
+       r.window := t ; Assign the title to the "window" property of the rectangle object
+   }
+
+   for _, r in arrangement.rectangles { ; loop through all the rectangles in the arrangement (including those that weren't selected)
+       r.moveWindow() ; Call the "moveWindow" method on each rectangle to move its associated window
+   }
+
+   Hotkey, ^!Tab, on ; Turn on the hotkey for Ctrl+Alt+Tab
+   Gui, gBottom: hide ; Hide the bottom panel (which contains the buttons to select the arrangements)
+   Gui, gTop: Hide ; Hide the top panel (which contains the buttons to toggle the hotkeys)
+
+   return ; End the function
 }
-
-; This function redraws the gui if desktops are created or removed .
-guiCreateByDesktopCount(taskCoords) {
-    global A_LastDesktopCount, taskBarLocation, DesktopCount
-
-    static badTitles := ["virtual_desktop_gui"
-                        , "VirtualDesktopGUI.ahk"
-                        , ""
-                        , "Task Manager"
-                        , "Program Manager"]
-
-    measurements := getElementMeasurements(taskCoords)
-    
-    guiSpace := measurements.positions.guiSpace
-    gui destroy
-    gui,% "-dpiscale"
-        . " +LastFound"
-        . " +AlwaysOnTop"
-        . " +ToolWindow"
-        . " -Caption"
-        . " +Border"
-        . " +E0x08000000"
-
-    ; Create a new button for each desktop.
-    isVertical := measurements.orientation = "vertical"
-    posButtons := measurements.positions.desktopButtons
-
-    loop,% DesktopCount {
-        buttonIncrement := (!isVertical) 
-        ? posButtons.w / DesktopCount
-        : posButtons.h / DesktopCount
-        
-      ; Each desktop button has the same dimensions.
-      Gui, Add, Button, % ""
-      . " x" posButtons.x + ( isVertical ? 0 
-                            : posButtons.w /  DesktopCount * (A_Index - 1))
-      . " y" posButtons.y + ( isVertical 
-                            ? posButtons.h /  DesktopCount * (A_Index - 1) : 0)
-      . " w" posButtons.w / ( isVertical ? 1: DesktopCount)
-      . " h" posButtons.h / ( isVertical ? DesktopCount: 1)
-      . " gDesktopButtons"
-      ,% "DESKTOP" A_Index
-      
-      p := "DESKTOP " A_Index " { "
-      . "`n`tx = " (posButtons.x + ( isVertical 0
-                                    ? 0 : buttonIncrement * A_Index))
-      . "`n`ty = " (posButtons.y +( isVertical 
-                                    ? buttonIncrement * A_Index : 0))
-      . "`n`tw = " posButtons.w
-      . "`n`th = " posButtons.h
-      . "`n}`n"
-      s .= p
+soloPositionLabel:
+GuiControlGet, %A_GUIControl%position, Pos, %A_GuiControl%
+newX := %A_GUIControl%positionW
+for key, val in arrangements {
+    if !(InStr(  A_GuiControl,val.name ) ) { ; Find out if the RectangleArrangement goes with the pressed button
+        controlName := val.name ; If not, hide the translucent button that goes with that RectangleArrangement
+        GuiControl, gTop: Hide, %controlName%
+        for k, v in val.rectangles {
+            GuiControl, gBottom: Hide, % v.name ; hide all the Rectangles inside that Rectangle Arrangement
+        }
     }
-    
-    specialButtons := measurements.positions.specialButtons
-    ; Create each of the special function buttons.
-    for buttonName, specialButton in specialButtons {
-      Gui, Add, Button, % ""
-    . " x" specialButton.x
-    . " y" specialButton.y
-    . " w" specialButton.w
-    . " h" specialButton.h
-    ,% buttonName
+    else { ; The only one that will remain goes with the clicked Rectangle Arrangement
+        controlName := val.name
+        GuiControlGet, gTopposition, Pos, %controlName% ; move it over to x0
+        gToppositionX -= newX
+        GuiControl, Move, %controlName%, x%gToppositionX% y%gToppositionY% w%gToppositionW% h%gToppositionH%
+        WinActivate, gBottom ; do the same for its Rectangles
+        ;*** This loop has all the trouble!!
+        for k, v in val.rectangles {
+            controlName := v.name
+            GuiControlGet, OutputVar, Pos , % v.name
+            GuiControl, Move, %controlName%, x
+        }
     }
-    
-    ; Name the gui and get its position, and save the taskbar
-    ; x and y coordinates to check if the gui should move later.
-    gui, show,% ""
-    . " x" guiSpace.x
-    . " y" guiSpace.y
-    . " w" guiSpace.w
-    . " h" guiSpace.h
-    ,% "virtual_desktop_gui"
-    
-    WinGetActiveTitle, guistats
-    WinGetPos, guix, guiy, guiwidth, guiheight, %guistats% 
-    
-    WinGet, Z_Order_List, List
-    edge := measurements.edge
-    Loop % Z_Order_List {
-        WinGetTitle, ID2Title, % "ahk_id " Z_Order_List%A_Index%
-        if (!DllCall("IsWindowVisible",uint,Z_Order_List%A_Index%)){
-          continue
+}
+GuiControl, MoveDraw, %A_GuiControl%, % "-x"  %newX%
+;~ Gui, gTop: Show, xCenter y%scaleY% w%buttonWidth% h%scaleY%
+Gui, gTop: hide
+;~ Gui, gBottom: Show, xCenter y%scaleY% w%buttonWidth% h%scaleY%
+Gui, gBottom: Show,% "xCenter y" A_ScreenHeight * 15 / 16 - scaleY " w" gToppositionW " h" scaleY, gBottom
+moveWindows(arrangement)
+return
+Escape::ExitApp
+
+Class RectangleArrangement {
+    __New(params)
+    {
+        for key, value in params{
+            this[key] := value
         }
-        if(contains(badTitles, ID2Title)) {
-          continue
+        this.hwnd := "h_" this.name
+    }
+
+    setSoloPosition(isSelectedArrangement) {
+        if(isSelectedArrangement) {
+            for k, r in this.rectangles {
+                GuiControl, Move, r.name,% "x" r.soloPos " y" r.y " w" r.w " h" r.h
+            }
+        } else {
+            for k, r in this.rectangles {
+                GuiControl, Move, r.name,% "x" r.x " y" r.y " w" r.w " h" r.h
+            }
         }
-        
-        WinGetPos, x, y, w, h,% ID2Title
-        
-        ; Window is too far left, scoot right and subtract from width.
-        if(x < guiSpace.w && edge = "left"){
-          x := guiSpace.w
-          w -= (guiSpace.w - x)
+    }
+
+    setVisible(bool) {
+        if(bool) {
+            for k, v in this.rectangles {
+                GuiControl, gBottom: Show,% v.name
+            }
+            GuiControl, gTop: Show,% this.name
+        } else {
+            for k, v in this.rectangles {
+                GuiControl, gBottom: Hide,% v.name
+            }
+            GuiControl, gTop: Hide,% this.name
         }
-        ; Window is too far up, scoot down and subtract from width.
-        if(y < guiSpace.h && edge = "top"){
-          y := guiSpace.h
-          h -= (guiSpace.h - y)
-        }
-        ; Window is too far down, subtract from height to shorten it.
-        if(y > guiSpace.y && edge = "bottom"){
-          h -= (y + h - guiSpace.y)
-        }
-        ; Window is too far right, subtract from width make it more narrow.
-        if(x + w > guiSpace.x && edge = "right"){
-          w -= (x + w - guiSpace.x)
-        }
-        
-        title := "ahk_id " Z_Order_List%A_Index%
-        WinMove,% title,, x, y, w, h
     }
 }
 
-; This function moves the user to the given virtual desktop if it exists.
-; It prepares for a call to switchDesktopByNumber() function.
-moveToDesktop(targetDesktop) {
-  global CurrentDesktop, DesktopCount
-
-  ; Save the active window's name to potentially move it later
-  WinGetActiveTitle, title
-
-  ; Runs if we want to move a window to another desktop
-  ; and any window except besides the gui is active
-  if (CurrentDesktop != targetDesktop) {
-    if(WinActive, "ahk_class ApplicationFrameWindow") {
-      title := title " " MODERN_APP_AHK_CLASS
+Class Rectangle {
+    __New(params)
+    {
+        for key, value in params{
+            this[key] := value
+        }
+        this.hwnd := "h_" this.name
     }
-    winhide, % title
-    switchDesktopByNumber(targetDesktop)
-    winshow,% title
-    windowWasGrabbed := false
-  }
-}
-
-; This function takes a number to a corresponding deskotp
-; and switches the screen to that desktop.
-switchDesktopByNumber(targetDesktop) {
-  global CurrentDesktop, DesktopCount
-  
-  ; Re-generate informatino on the number of desktops and where 
-  ; the current desktop is. We do this because the user may have
-  ; switched desktops via some other means than the script.
-  mapDesktopsFromRegistry(false)
-
-  ; Don't attempt to switch to an invalid desktop.
-  if (targetDesktop > DesktopCount || targetDesktop < 1) {
-    OutputDebug, [invalid] target: %targetDesktop% current: %CurrentDesktop%
-    return
-  }
-
-  ; Scan right until we reach the desktop we want.
-  while(CurrentDesktop < targetDesktop) {
-    Send ^#{Right}
-    CurrentDesktop++
-    OutputDebug, [Right] target: %targetDesktop% current: %CurrentDesktop%
-  }
-
-  ; Scan left until we reach the desktop we want.
-  while(CurrentDesktop > targetDesktop) {
-    Send ^#{Left}
-    CurrentDesktop--
-    OutputDebug, [left] target: %targetDesktop% current: %CurrentDesktop%
-  }
-  DetectHiddenWindows, off
-}
-
-; This function creates a new virtual desktop and associated button.
-createVirtualDesktop() {
-  global CurrentDesktop, DesktopCount
-  Send, #^d
-  DesktopCount++
-  A_LastDesktopCount++
-  CurrentDesktop = %DesktopCount%
-  OutputDebug, [create] desktops: %DesktopCount% current: %CurrentDesktop%
-  guiCreateByDesktopCount(taskBarHasMoved().taskCoords)
-}
-
-; This function deletes the current virtual desktop and associated button.
-deleteVirtualDesktop() {
-  global CurrentDesktop, DesktopCount
-  if(DesktopCount == 1){
-    return
-  }
-  Send, #^{F4}
-  DesktopCount--
-  A_LastDesktopCount--
-  CurrentDesktop--
-  OutputDebug, [delete] desktops: %DesktopCount% current: %CurrentDesktop%
-  guiCreateByDesktopCount(taskBarHasMoved().taskCoords)
-}
-
-; This function checks if the gui needs to move.
-; It is invoked from the guiCheck label above.
-guiCheck() {
-  taskBarCheck := taskBarHasMoved()
-  if(taskBarCheck.hasMoved) {
-    guiCreateByDesktopCount(taskBarCheck.taskCoords)
-  }
-}
-
-; Helper method to make sure we don't try to move 
-; certain windows that should not or cannot be moved.
-contains(badTitles, title) {
-  for key, val in badTitles {
-    if(val = title) {
-      return true
+    moveWindow() {
+        x :=  this.x * A_ScreenWidth
+        y := this.y * A_ScreenHeight
+        w := this.w * A_ScreenWidth
+        h := this.h * A_ScreenHeight
+        WinMove,% this.window,,%x%,%y%, %w% ,%h%
+        this.window := ""
     }
-  }
-  return false
 }
-
-; Hotkey F18 is a stylus pen button, used to detect gui presses,
-; and toggles the boolean value 'movewin'.
-~F18::windowWasGrabbed = true
-
-; This is the button for selecting a one-time movement of
-; a window to whichever virtual desktop is chosen next.
-ButtonGRAB:
-if (windowWasGrabbed) {
-  ToolTip, Window movement off, %grabx%-300, %graby%-100
-  windowWasGrabbed := false
-  SetTimer, RemoveToolTip, 5000
-  return
-}
-ToolTip,% "Window movement on`r(Tap a window"
-        . "`rand select a desktop)", %grabx%-300, %graby%-100
-
-windowWasGrabbed := true
-SetTimer, RemoveToolTip, 5000
+^!Tab::
+Gui, gBottom: Show,% "xCenter y0 w" guiWidth " h" scaleY, gBottom
+Gui, gTop: Show,% "xCenter y0 w" guiWidth " h" scaleY, gTop
+WinActivate, gTop
+Hotkey, ^!Tab, off
 return
-
-; This is the button for selecting a window to always
-; follow the user to the active desktop.
-ButtonFOLLOW:
-WinWaitNotActive, desktop switcher
-WinGetActiveTitle, bring
-if (bringwin) {
-  bringwin := false
-  SetTimer, RemoveToolTip, 5000
-  return
-}
-ToolTip,% "Active window will follow"
-          . "`ryou to each desktop", %grabx%-300, %graby%-100
-
-bringwin := true
-SetTimer, RemoveToolTip, 5000
-return
-
-
-; This label removes a tooltip.
-RemoveToolTip:
-SetTimer, RemoveToolTip, Off
-ToolTip
-return
-
-; This label uses regex to extract the desktop number from the a DESKTOP 
-; buttons button when pressed, and passes it the the moveToDesktop function.
-DesktopButtons:
-moveToDesktop(RegExReplace(A_GuiControl, "DESKTOP", ""))
-return
-
-; This label checks if the gui needs to be redrawn
-; It invokes the guiCheck function below
-guiCheck: 
-guiCheck()
-SetTimer, guiCheck, -500
-return
-
-; This is the add button label
-Button+:
-createVirtualDesktop()
-return
-
-; This is the remove button label
-ButtonX:
-deleteVirtualDesktop()
-return
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-/*
-User config!
-This section binds a key combo to the switch/create/delete actions.
-Each combo is one of the following:
-  Windows Key + <number> --> switch to that numebr desktop (0 = desktop 10)
-  Windows Key + <f4> --> delete the current desktop
-Uncomment the hotkeys you want to use, or just leave it alone and
-handle everything through the gui :)
-*/
-;~ ^#f4::deleteVirtualDesktop()
-;~ ^#1::switchDesktopByNumber(1)
-;~ ^#2::switchDesktopByNumber(2)
-;~ ^#3::switchDesktopByNumber(3)
-;~ ^#4::switchDesktopByNumber(4)
-;~ ^#5::switchDesktopByNumber(5)
-;~ ^#6::switchDesktopByNumber(6)
-;~ ^#7::switchDesktopByNumber(7)
-;~ ^#8::switchDesktopByNumber(8)
-;~ ^#9::switchDesktopByNumber(9)
-;~ ^#0::switchDesktopByNumber(10)
